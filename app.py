@@ -153,6 +153,10 @@ def image_to_byte_array(image:Image):
   imgByteArr = imgByteArr.getvalue()
   return imgByteArr
 
+@app.route('/')
+def hello_world():
+    return 'Hello, World!'
+
 # route http posts to this method
 @app.route('/api/test', methods=['POST'])
 def main():
@@ -173,5 +177,4 @@ def main():
     img_encoded=image_to_byte_array(np_img)
     return Response(response=img_encoded, status=200,mimetype="image/jpeg")
     
-if __name__== "__main__":
-  app.run(debug=True, host='0.0.0.0')
+ 
