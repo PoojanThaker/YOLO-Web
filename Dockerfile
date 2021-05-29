@@ -9,5 +9,4 @@ RUN pip3 install -r requirements.txt
 RUN apt-get install wget -y
 RUN wget https://pjreddie.com/media/files/yolov3.weights
 COPY . /app
-ENTRYPOINT [ "python3" ]
-CMD [ "app.py" ]
+ENTRYPOINT [ "python3 app.py"]

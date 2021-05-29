@@ -177,4 +177,8 @@ def main():
     img_encoded=image_to_byte_array(np_img)
     return Response(response=img_encoded, status=200,mimetype="image/jpeg")
     
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host = '0.0.0.0', port = port)
+    
  
