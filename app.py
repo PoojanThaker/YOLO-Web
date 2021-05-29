@@ -189,6 +189,7 @@ def solve(image):
     img = image
     npimg=np.array(img)
     image=npimg.copy()
+    print("Image is ", image)
     image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
     res=get_predection(image,nets,Lables,Colors)
     image=cv2.cvtColor(res,cv2.COLOR_BGR2RGB)
