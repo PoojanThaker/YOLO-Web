@@ -18,6 +18,20 @@ import io
 import json
 from PIL import Image
 
+class VideoCamera(object):
+    def __init__(self):
+        self.video = cv2.VideoCapture(0)
+
+    def __del__(self):
+        self.video.release()        
+
+    def get_frame(self):
+        ret, frame = self.video.read()
+        return frame
+        
+
+video_stream = VideoCamera()
+
 confthres=0.5
 nmsthres=0.1
 path="./"
@@ -156,6 +170,29 @@ def image_to_byte_array(image:Image):
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
+
+def gen(camera):
+    while True:
+        frame = camera.get_frame()
+        frame = solve(frame)
+        ret,jpeg = cv2.imencode('.jpg', frame)
+        frame = jpeg.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+               
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen(video_stream),
+                mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def solve(image):
+    img = image
+    npimg=np.array(img)
+    image=npimg.copy()
+    image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+    res=get_predection(image,nets,Lables,Colors)
+    image=cv2.cvtColor(res,cv2.COLOR_BGR2RGB)
+    return image
 
 # route http posts to this method
 @app.route('/api/test', methods=['POST'])
