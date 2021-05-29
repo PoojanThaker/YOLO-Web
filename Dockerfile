@@ -6,6 +6,7 @@ COPY ./requirements.txt /app/requirements.txt
 WORKDIR /app
 RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
+RUN wget https://pjreddie.com/media/files/yolov3.weights
 COPY . /app
 ENTRYPOINT [ "python3" ]
 CMD [ "app.py" ]
