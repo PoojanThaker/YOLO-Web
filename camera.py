@@ -40,6 +40,8 @@ class Camera(object):
             sleep(0.01)
 
     def enqueue_input(self, input):
+        if len(self.to_process)>10:
+            self.to_process = [x for i,x in enumerate(self.to_process) if i%2==1]
         self.to_process.append(input)
 
     def get_frame(self):
