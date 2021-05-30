@@ -8,6 +8,8 @@ import argparse
 import time
 import cv2
 import os
+from flask import Flask, render_template, Response, request, jsonify
+from flask_socketio import SocketIO
 from flask import Flask, request, Response, jsonify
 import jsonpickle
 #import binascii
@@ -30,7 +32,9 @@ class VideoCamera(object):
         return frame
         
 
+
 video_stream = VideoCamera()
+
 
 confthres=0.5
 nmsthres=0.1
@@ -160,6 +164,7 @@ nets=load_model(CFG,Weights)
 Colors=get_colors(Lables)
 # Initialize the Flask application
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 def image_to_byte_array(image:Image):
   imgByteArr = io.BytesIO()
@@ -167,17 +172,13 @@ def image_to_byte_array(image:Image):
   imgByteArr = imgByteArr.getvalue()
   return imgByteArr
 
-@app.route('/')
-def hello_world():
-    return 'Hello, World!'
 
 def gen(camera):
     while True:
         frame = camera.get_frame()
-        if frame:
-            frame = solve(frame)
-            ret,jpeg = cv2.imencode('.jpg', frame)
-            frame = jpeg.tobytes()
+        frame = solve(frame)
+        ret,jpeg = cv2.imencode('.jpg', frame)
+        frame = jpeg.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
                
@@ -185,6 +186,11 @@ def gen(camera):
 def video_feed():
     return Response(gen(video_stream),
                 mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/')
+def index():
+    """Video streaming home page."""
+    return render_template('index.html')
 
 def solve(image):
     img = image
