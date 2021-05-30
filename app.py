@@ -164,7 +164,7 @@ nets=load_model(CFG,Weights)
 Colors=get_colors(Lables)
 # Initialize the Flask application
 app = Flask(__name__)
-socketio = SocketIO(app)
+ 
 
 def image_to_byte_array(image:Image):
   imgByteArr = io.BytesIO()
