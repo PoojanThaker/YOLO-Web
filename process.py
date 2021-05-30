@@ -26,8 +26,8 @@ nmsthres=0.1
 path="./"
 yolo_path = path
 labels_path = "coco.names"
-weights_path = "yolov3.weights"
-config_path = "yolov3.cfg"
+weights_path = "yolov3-tiny.weights"
+config_path = "yolov3-tiny.cfg"
 
 def get_labels(labels_path):
     # load the COCO class labels our YOLO model was trained on
