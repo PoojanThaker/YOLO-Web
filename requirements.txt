@@ -4,4 +4,7 @@ jsonpickle
 pillow
 numpy
 opencv-python
-flask_socketio
+python-engineio==3.13.2
+python-socketio==4.6.0
+Flask-SocketIO==4.3.1
+
