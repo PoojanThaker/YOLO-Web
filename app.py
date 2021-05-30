@@ -1,229 +1,61 @@
-import numpy as np
-import argparse
-import time
-import cv2
-import os
-import numpy as np
-import argparse
-import time
-import cv2
-import os
+from sys import stdout
+from process import webopencv
+import logging
 from flask import Flask, render_template, Response, request, jsonify
 from flask_socketio import SocketIO
-from flask import Flask, request, Response, jsonify
-import jsonpickle
-#import binascii
-import io as StringIO
-import base64
-from io import BytesIO
-import io
-import json
-from PIL import Image
-
-class VideoCamera(object):
-    def __init__(self):
-        self.video = cv2.VideoCapture(0)
-
-    def __del__(self):
-        self.video.release()        
-
-    def get_frame(self):
-        ret, frame = self.video.read()
-        return frame
-        
-
-
-video_stream = VideoCamera()
-
+from camera import Camera
+from utils import base64_to_pil_image, pil_image_to_base64
+# import jsonify
 
 confthres=0.5
 nmsthres=0.1
-path="./"
-yolo_path = path
-labels_path = "coco.names"
-weights_path = "yolov3.weights"
-config_path = "yolov3.cfg"
 
-def get_labels(labels_path):
-    # load the COCO class labels our YOLO model was trained on
-    #labelsPath = os.path.sep.join([yolo_path, "yolo_v3/coco.names"])
-    lpath=os.path.sep.join([yolo_path, labels_path])
-    LABELS = open(lpath).read().strip().split("\n")
-    return LABELS
-
-def get_colors(LABELS):
-    # initialize a list of colors to represent each possible class label
-    np.random.seed(42)
-    COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),dtype="uint8")
-    return COLORS
-
-def get_weights(weights_path):
-    # derive the paths to the YOLO weights and model configuration
-    weightsPath = os.path.sep.join([yolo_path, weights_path])
-    return weightsPath
-
-def get_config(config_path):
-    configPath = os.path.sep.join([yolo_path, config_path])
-    return configPath
-
-def load_model(configpath,weightspath):
-    # load our YOLO object detector trained on COCO dataset (80 classes)
-    print("[INFO] loading YOLO from disk...")
-    net = cv2.dnn.readNetFromDarknet(configpath, weightspath)
-    return net
-    
-def get_predection(image,net,LABELS,COLORS):
-    (H, W) = image.shape[:2]
-
-    # determine only the *output* layer names that we need from YOLO
-    ln = net.getLayerNames()
-    ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-    # construct a blob from the input image and then perform a forward
-    # pass of the YOLO object detector, giving us our bounding boxes and
-    # associated probabilities
-    blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416),
-                                 swapRB=True, crop=False)
-    net.setInput(blob)
-    start = time.time()
-    layerOutputs = net.forward(ln)
-    print(layerOutputs)
-    end = time.time()
-
-    # show timing information on YOLO
-    print("[INFO] YOLO took {:.6f} seconds".format(end - start))
-
-    # initialize our lists of detected bounding boxes, confidences, and
-    # class IDs, respectively
-    boxes = []
-    confidences = []
-    classIDs = []
-
-    # loop over each of the layer outputs
-    for output in layerOutputs:
-        # loop over each of the detections
-        for detection in output:
-            # extract the class ID and confidence (i.e., probability) of
-            # the current object detection
-            scores = detection[5:]
-            # print(scores)
-            classID = np.argmax(scores)
-            # print(classID)
-            confidence = scores[classID]
-
-            # filter out weak predictions by ensuring the detected
-            # probability is greater than the minimum probability
-            if confidence > confthres:
-                # scale the bounding box coordinates back relative to the
-                # size of the image, keeping in mind that YOLO actually
-                # returns the center (x, y)-coordinates of the bounding
-                # box followed by the boxes' width and height
-                box = detection[0:4] * np.array([W, H, W, H])
-                (centerX, centerY, width, height) = box.astype("int")
-
-                # use the center (x, y)-coordinates to derive the top and
-                # and left corner of the bounding box
-                x = int(centerX - (width / 2))
-                y = int(centerY - (height / 2))
-
-                # update our list of bounding box coordinates, confidences,
-                # and class IDs
-                boxes.append([x, y, int(width), int(height)])
-                confidences.append(float(confidence))
-                classIDs.append(classID)
-
-    # apply non-maxima suppression to suppress weak, overlapping bounding
-    # boxes
-    idxs = cv2.dnn.NMSBoxes(boxes, confidences, confthres,
-                            nmsthres)
-
-    # ensure at least one detection exists
-    if len(idxs) > 0:
-        # loop over the indexes we are keeping
-        for i in idxs.flatten():
-            # extract the bounding box coordinates
-            (x, y) = (boxes[i][0], boxes[i][1])
-            (w, h) = (boxes[i][2], boxes[i][3])
-
-            # draw a bounding box rectangle and label on the image
-            color = [int(c) for c in COLORS[classIDs[i]]]
-            cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-            text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
-            print(boxes)
-            print(classIDs)
-            cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,0.5, color, 2)
-    return image
-    
-labelsPath=labels_path
-cfgpath=config_path
-wpath=weights_path
-Lables=get_labels(labelsPath)
-CFG=get_config(cfgpath)
-Weights=get_weights(wpath)
-nets=load_model(CFG,Weights)
-Colors=get_colors(Lables)
-# Initialize the Flask application
+#----------------- Video Transmission ------------------------------#
 app = Flask(__name__)
- 
+app.logger.addHandler(logging.StreamHandler(stdout))
+app.config['DEBUG'] = True
+socketio = SocketIO(app)
+camera = Camera(webopencv())
 
-def image_to_byte_array(image:Image):
-  imgByteArr = io.BytesIO()
-  image.save(imgByteArr, format='PNG')
-  imgByteArr = imgByteArr.getvalue()
-  return imgByteArr
+#---------------- Video Transmission --------------------------------#
 
 
-def gen(camera):
-    while True:
-        frame = camera.get_frame()
-        frame = solve(frame)
-        ret,jpeg = cv2.imencode('.jpg', frame)
-        frame = jpeg.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
-               
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen(video_stream),
-                mimetype='multipart/x-mixed-replace; boundary=frame')
+#---------------- Video Socket Connections --------------------------#
+@socketio.on('input image', namespace='/test')
+def test_message(input):
+    input = input.split(",")[1]
+    camera.enqueue_input(input)
+    #camera.enqueue_input(base64_to_pil_image(input))
+
+
+@socketio.on('connect', namespace='/test')
+def test_connect():
+    app.logger.info("client connected")
+
 
 @app.route('/')
 def index():
     """Video streaming home page."""
     return render_template('index.html')
 
-def solve(image):
-    img = image
-    npimg=np.array(img)
-    image=npimg.copy()
-    print("Image is ", image)
-    image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-    res=get_predection(image,nets,Lables,Colors)
-    image=cv2.cvtColor(res,cv2.COLOR_BGR2RGB)
-    return image
 
-# route http posts to this method
-@app.route('/api/test', methods=['POST'])
-def main():
-    # load our input image and grab its spatial dimensions
-    #image = cv2.imread("./test1.jpg")
-    img = request.files["image"].read()
-    img = Image.open(io.BytesIO(img))
-    npimg=np.array(img)
-    image=npimg.copy()
-    image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-    res=get_predection(image,nets,Lables,Colors)
-    # image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-    # show the output image
-    #cv2.imshow("Image", res)
-    #cv2.waitKey()
-    image=cv2.cvtColor(res,cv2.COLOR_BGR2RGB)
-    np_img=Image.fromarray(image)
-    img_encoded=image_to_byte_array(np_img)
-    return Response(response=img_encoded, status=200,mimetype="image/jpeg")
-    
+def gen():
+    """Video streaming generator function."""
+
+    app.logger.info("starting to generate frames!")
+    while True:
+        frame = camera.get_frame() #pil_image_to_base64(camera.get_frame())
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host = '0.0.0.0', port = port)
+    app.logLevel='WARNING'
+    socketio.run(app)
     
- 
