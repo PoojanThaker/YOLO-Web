@@ -57,6 +57,7 @@ def video_feed():
 
 if __name__ == '__main__':
     app.logLevel='WARNING'
+    import os
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=True,port=port)
     
